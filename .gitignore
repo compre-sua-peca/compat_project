@@ -1,0 +1,12 @@
+venv/
+.env/
+.env
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+migrations/
+.ipynb_checkpoints/
+dist/
+build/
+*.egg-info/
