@@ -53,12 +53,66 @@ class ProjectController:
         car = self.service.get_car(vehicle_name)
         return car
     
+    def get_car_by_brand(self, id_brand: int):
+        if not id_brand:
+            return jsonify({'error': 'Brand ID is required'}), 400
+
+        try:
+            cars = self.service.get_car_by_brand(id_brand)
+            return cars
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        
+    def get_model_by_id_car(self, id_car: int):
+        if not id_car:
+            return jsonify({'error': 'Car ID is required'}), 400
+
+        try:
+            models = self.service.get_model_by_id_car(id_car)
+            return models
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        
+    def get_year_by_id_car(self, id_car: int):
+        if not id_car:
+            return jsonify({'error': 'Car ID is required'}), 400
+
+        try:
+            years = self.service.get_year_by_id_car(id_car)
+            return years
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    def get_all_brands(self):
+        return self.service.get_all_brand()
+    
     def get_model_car(self, car_version: str):
         if not car_version:
             return jsonify({'error': 'Car version is required'}), 400
 
         model = self.service.get_model_car(car_version)
         return model
+    
+    def get_model_by_id(self, id_model: int):
+        if not id_model:
+            return jsonify({'error': 'Model ID is required'}), 400
+
+        try:
+            model = self.service.get_model_by_id(id_model)
+            return model
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    def select_model(self, id_brand: int, id_car: int, year: str):
+        if not id_brand or not id_car or not year:
+            return jsonify({'error': 'Brand ID, Car ID, and Year are required'}), 400
+
+        try:
+            model = self.service.select_model(id_brand, id_car, year)
+            return model
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
     
     def delete_model(self, id_model: int):
         if not id_model:

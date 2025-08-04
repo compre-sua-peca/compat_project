@@ -34,7 +34,7 @@ class CarModel(db.Model):
 
     id_model = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     id_car = Column(Integer, ForeignKey('car.id_car', ondelete='NO ACTION', onupdate='NO ACTION'), nullable=False)
-    car_version = Column(String(50), nullable=False)
+    car_version = Column(String(200), nullable=False)
     year = Column(String(10), nullable=False)
     specifications = Column(Text, nullable=False)
 
