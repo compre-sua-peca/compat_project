@@ -1,8 +1,6 @@
-from flask import Flask, request, jsonify, send_file, Blueprint, Response, current_app
+from flask import jsonify
 from flask_injector import inject
 from src.services.project_service import ProjectService
-import openpyxl
-
 
 class ProjectController:
     @inject
@@ -11,7 +9,6 @@ class ProjectController:
 
     def create_car(self, request):
         json_data = request.get_json()
-
         response = self.service.create_full_data(json_data)
         return response
 

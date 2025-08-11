@@ -1,4 +1,5 @@
 from injector import Binder
+from src.dal.repositories.compat_repository import CompatRepository
 from src.controllers.project_controller import ProjectController
 from src.dal.database import DataBase
 from src.services.project_service import ProjectService
@@ -7,5 +8,6 @@ from src.services.project_service import ProjectService
 def project_injector(binder: Binder) -> Binder:
     binder.bind(ProjectController, ProjectController)
     binder.bind(ProjectService, ProjectService)
+    binder.bind(CompatRepository, CompatRepository)
     
     return binder

@@ -6,10 +6,10 @@
 
 from flask import Flask
 
-from src.routes.project_routes import project_bp
+from src.routes.project_routes import compat
 
 blueprints = [
-    project_bp
+    compat
 ]
 
 def register_blueprints(app: Flask) -> None:

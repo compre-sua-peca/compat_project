@@ -1,6 +1,6 @@
 from flask import Response, jsonify
 from flask_injector import inject
-from src.dal.repositories.example_repository import ExampleRepository
+from src.dal.repositories.compat_repository import CompatRepository
 from src.dal.database import db
 from src.models.db_model import Car, Brand, CarModel
 import pandas as pd
@@ -8,46 +8,35 @@ import pandas as pd
 
 class ProjectService:
     @inject
-    def __init__(self) -> None:
+    def __init__(self, Repository: CompatRepository) -> None:
+        self.repository = Repository
         pass
 
     def create_full_data(self, json_data: dict):
-        if Car.query.filter_by(vehicle_name=json_data['vehicle_name'].lower()).first():
+        vehicle_name = json_data['vehicle_name'].lower()
+        brand_name = json_data['brand_name'].lower()
+        car_version = json_data['car_version'].lower()
+        year = json_data['year']
+        specifications = json_data['specifications'].lower()
+
+        if Car.query.filter_by(vehicle_name=vehicle_name).first():
             return jsonify({'error': 'Veículo já existe'}), 400
 
-        new_brand = Brand(
-            brand_name=json_data['brand_name'].lower()
+        create_register = self.repository.create_full_data(
+            vehicle_name=vehicle_name,
+            brand_name=brand_name,
+            car_version=car_version,
+            year=year,
+            specifications=specifications
         )
-        db.session.add(new_brand)
-        db.session.flush()
-
-        new_car = Car(
-            vehicle_name=json_data['vehicle_name'].lower(),
-            id_brand=new_brand.id_brand
-        )
-        db.session.add(new_car)
-        db.session.flush()
-
-        new_model = CarModel(
-            id_car=new_car.id_car,
-            car_version=json_data['car_version'].lower(),
-            year=json_data['year'],
-            specifications=json_data['specifications'].lower()
-        )
-        try:
-            db.session.add(new_model)
-            db.session.commit()
-            return jsonify({'success': "Data created successfully"}), 200
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'error': str(e)}), 500
-        finally:
-            db.session.close()
+        return create_register
 
     def get_all_cars(self):
-        cars = Car.query.all()
+        cars = self.repository.get_all_cars()
+
         if not cars:
-            return jsonify({'message': 'No cars found'}), 404
+            return jsonify({'message': 'No cars found'}), 400
+
         return jsonify([{
             'id_car': car.id_car,
             'vehicle_name': car.vehicle_name,
@@ -61,9 +50,7 @@ class ProjectService:
         } for car in cars]), 200
 
     def get_all_brand(self):
-        brands = Brand.query.all()
-        if not brands:
-            return jsonify({'message': 'No brands found'}), 404
+        brands = self.repository.get_all_brands()
         brands_list = [
             {
                 "id_brand": brand.id_brand,
@@ -81,57 +68,28 @@ class ProjectService:
             df = pd.read_excel(file)
 
             for i, row in df.iterrows():
-                try:
-                    brand_name = str(row['brand_name']).lower()
-                    vehicle_name = str(row['vehicle_name']).lower()
-                    car_version = str(row['vehicle_name']).lower()
-                    year = str(row['year'])
-                    specifications = str(row['vehicle_name']).lower()
+                brand_name = str(row['brand_name']).lower()
+                vehicle_name = str(row['vehicle_name']).lower()
+                car_version = str(row['vehicle_name']).lower()
+                year = str(row['year'])
+                specifications = str(row['vehicle_name']).lower()
 
-                    # Verifica se a marca já existe
-                    brand = Brand.query.filter_by(
-                        brand_name=brand_name).first()
+                vehicle, error = self.repository.create_car_structure(
+                    brand_name=brand_name,
+                    vehicle_name=vehicle_name,
+                    car_version=car_version,
+                    year=year,
+                    specifications=specifications
+                )
 
-                    if not brand:
-                        # Cria nova marca
-                        brand = Brand(brand_name=brand_name)
-                        db.session.add(brand)
-                        db.session.flush()  # garante que o ID da marca seja gerado
-
-                    # Verifica se o carro já existe
-                    car = Car.query.filter_by(
-                        vehicle_name=vehicle_name, id_brand=brand.id_brand).first()
-                    if not car:
-                        car = Car(vehicle_name=vehicle_name,
-                                  id_brand=brand.id_brand)
-                        db.session.add(car)
-                        db.session.flush()
-
-                    # Verifica se o modelo já existe
-                    model_exists = CarModel.query.filter_by(
-                        id_car=car.id_car,
-                        car_version=car_version,
-                        year=year
-                    ).first()
-
-                    if not model_exists:
-                        model = CarModel(
-                            id_car=car.id_car,
-                            car_version=car_version,
-                            year=year,
-                            specifications=specifications
-                        )
-                        db.session.add(model)
-
-                    success.append(vehicle_name)
-
-                except Exception as e:
-                    db.session.rollback()
+                if error:
                     errors.append({
                         'row': i + 2,
                         'vehicle_name': row.get('vehicle_name'),
-                        'error': str(e)
+                        'error': error
                     })
+                else:
+                    success.append(vehicle)
 
             db.session.commit()
 
@@ -147,92 +105,77 @@ class ProjectService:
             db.session.close()
 
     def get_model_by_brand(self, brand_id: int):
-        if not brand_id:
-            return jsonify({'error': 'Brand ID is required'}), 400
+        brand, cars = self.repository.get_models_by_brand(brand_id)
 
-        brand = Brand.query.get(brand_id)
         if not brand:
-            return jsonify({'error': 'Brand not found'}), 404
-
-        cars = Car.query.filter_by(id_brand=brand_id).all()
+            return {"error": "Brand not found"}, 500
         if not cars:
-            return jsonify({'error': 'No vehicles found for this brand'}), 404
+            return {"error": "No vehicles found for this brand"}, 500
 
         response_data = {
             "brand": brand.brand_name,
-            "vehicles": []
+            "vehicles": [
+                {
+                    "vehicle_name": car.vehicle_name,
+                    "models": [
+                        {
+                            "car_version": model.car_version,
+                            "car_id": model.id_model,
+                            "specifications": model.specifications
+                        }
+                        for model in CarModel.query.filter_by(id_car=car.id_car).all()
+                    ]
+                }
+                for car in cars
+            ]
         }
 
-        for car in cars:
-            models = CarModel.query.filter_by(id_car=car.id_car).all()
-
-            response_data["vehicles"].append({
-                "vehicle_name": car.vehicle_name,
-                "models": [{
-                    "car_version": model.car_version,
-                    "car_id": model.id_model,
-                    "specifications": model.specifications
-                } for model in models]
-            })
-        return jsonify(response_data), 200
+        return response_data, 200 
 
     def get_brand(self, brand_name: str):
-        try:
-            brand = Brand.query.filter_by(
-                brand_name=brand_name.lower()).first()
-            if not brand:
-                return jsonify({'error': 'Brand not found'}), 404
-
-            return jsonify({
-                'id_brand': brand.id_brand,
-                'brand_name': brand.brand_name}), 200
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            db.session.close()
+        if not brand_name:
+            return jsonify({'error': 'Brand name is required'}), 400
+        brand = self.repository.get_brand(brand_name)
+        return jsonify({"brand_name": brand.brand_name,
+                        "brand_id": brand.id_brand}), 200
 
     def get_car(self, vehicle_name: str):
         try:
-            car = Car.query.filter_by(
-                vehicle_name=vehicle_name.lower()).first()
+            car = self.repository.get_car(vehicle_name)
             if not car:
-                return jsonify({'error': 'Car not found'}), 404
+                return jsonify({'error': 'Car not found'}), 500
 
             return jsonify({
                 'id_car': car.id_car,
                 'vehicle_name': car.vehicle_name,
-                'brand_name': car.brand.brand_name}), 200
+                'brand_name': car.brand.brand_name
+            }), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
-        finally:
-            db.session.close()
-            
+
     def get_model_by_id_car(self, id_car: int):
         try:
-            car = Car.query.get(id_car)
-            if not car:
-                return jsonify({'error': 'Car not found'}), 404
-
-            models = CarModel.query.filter_by(id_car=id_car).all()
+            models = self.repository.get_model_by_id_car(id_car)
             if not models:
-                return jsonify({'error': 'No models found for this car'}), 404
-
+                
+                return jsonify({'error': 'No models found for this car'}), 500
             return jsonify([{
                 'id_model': model.id_model,
                 'car_version': model.car_version,
                 'year': model.year,
                 'specifications': model.specifications
             } for model in models]), 200
+            
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         finally:
             db.session.close()
-            
+
     def get_car_by_brand(self, id_brand: int):
         try:
-            cars = Car.query.filter_by(id_brand=id_brand).all()
+            cars = self.repository.get_car_by_brand(id_brand)
             if not cars:
-                return jsonify({'error': 'No cars found for this brand'}), 404
+                return jsonify({'error': 'No cars found for this brand'}), 500
 
             return jsonify([{
                 'id_car': car.id_car,
@@ -242,17 +185,12 @@ class ProjectService:
             return jsonify({'error': str(e)}), 500
         finally:
             db.session.close()
-            
+
     def get_year_by_id_car(self, id_car: int):
         try:
-            car = Car.query.get(id_car)
-            if not car:
-                return jsonify({'error': 'Car not found'}), 404
-
-            models = CarModel.query.filter_by(id_car=id_car).all()
+            models = self.repository.get_year_by_id_car(id_car)
             if not models:
-                return jsonify({'error': 'No models found for this car'}), 404
-
+                return jsonify({'error': 'No models found for this car'}), 500
             return jsonify([{
                 'year': model.year
             } for model in models]), 200
@@ -263,27 +201,35 @@ class ProjectService:
 
     def get_model_car(self, car_version: str):
         try:
-            model = CarModel.query.filter_by(
-                car_version=car_version.lower()).first()
-            if not model:
-                return jsonify({'error': f'{model} not found'}), 404
+            models = self.repository.get_model_car(car_version)
+            if not models:
+                return jsonify({'error': 'Model not found'}), 500
 
-            return jsonify({
-                'id_model': model.id_model,
-                'car_version': model.car_version,
-                'year': model.year,
-                'specifications': model.specifications}), 200
+            if not isinstance(models, list):
+                models = [models]
+            response = [
+                {
+                    'id_model': model.id_model,
+                    'car_version': model.car_version,
+                    'year': model.year,
+                    'specifications': model.specifications
+                }
+                for model in models
+            ]
+
+            return jsonify(response), 200
+
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
         finally:
             db.session.close()
-            
+
     def get_model_by_id(self, model_id: int):
         try:
-            model = CarModel.query.get(model_id)
+            model = self.repository.get_model_by_id(model_id)
             if not model:
                 return jsonify({'error': 'Model not found'}), 404
-
             return jsonify({
                 'id_model': model.id_model,
                 'car_version': model.car_version,
@@ -293,63 +239,46 @@ class ProjectService:
             return jsonify({'error': str(e)}), 500
         finally:
             db.session.close()
-            
+
     def select_model(self, id_brand: int, id_car: int, year: str):
         try:
-            brand = Brand.query.get(id_brand)
-            if not brand:
-                return jsonify({'error': 'Brand not found'}), 404
-            print(f"Brand: {brand.id_brand}")
-            car = Car.query.filter_by(id_brand=brand.id_brand, id_car=id_car).first()
-            if not car:
-                return jsonify({'error': 'Car not found'}), 404
-
-            model = CarModel.query.filter_by(id_car=id_car, year=year).first()
-            if not model:
+            response = self.repository.select_model(id_brand, id_car, year)
+            if not response:
                 return jsonify({'error': 'Model not found'}), 404
-
-            return jsonify({
-                'brand_name': brand.brand_name,
-                'vehicle_name': car.vehicle_name,
-                'car_version': model.car_version,
-                'year': model.year,
-                'specifications': model.specifications
-            }), 200
+            return jsonify(response), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         finally:
             db.session.close()
 
-    def delete_model(self, model_id: int):
+    def delete_model(self, id_model: int):
         try:
-            model = CarModel.query.get(model_id)
-            if not model:
+            deleted = self.repository.delete_model(id_model)
+            if not deleted:
                 return jsonify({'error': 'Model not found'}), 404
 
-            db.session.delete(model)
-            db.session.commit()
-            return jsonify({'message': f'Model: {model} deleted successfully'}), 200
+            return jsonify({'message': 'Model deleted successfully'}), 200
+
         except Exception as e:
             db.session.rollback()
             return jsonify({'error': str(e)}), 500
-        finally:
-            db.session.close()
+            
 
     def update_model(self, json_data: dict):
         model_id: int = json_data['model_id']
         car_version: str = json_data['car_version']
         specifications: str = json_data['specifications']
+
         try:
-            model = CarModel.query.get(model_id)
+            model = self.repository.update_model(
+                id_model=model_id,
+                car_version=car_version,
+                specifications=specifications
+            )
+
             if not model:
                 return jsonify({'error': 'Model not found'}), 404
 
-            model.car_version = car_version
-            model.specifications = specifications
-
-            db.session.add(model)
-            db.session.commit()
-            db.session.refresh(model)
             return jsonify({
                 'message': 'Model updated successfully',
                 "update": {
@@ -359,6 +288,7 @@ class ProjectService:
                     "specifications": model.specifications
                 }
             }), 200
+
         except Exception as e:
             db.session.rollback()
             return jsonify({'error': str(e)}), 500
