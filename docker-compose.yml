@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  compat:
+    image: compat
+    ports:
+      - "5000:5000"
+    environment:
+      - SQLALCHEMY_DATABASE_URI=mysql+pymysql://Compat-micro:Password546546@mb-datastream.cczerccre7oc.us-east-1.rds.amazonaws.com:3306/compatibility
+      - SQLALCHEMY_ECHO=False
+    command: bash start_server.sh
