@@ -8,7 +8,6 @@ from flask_dotenv import DotEnv
 from flask_injector import FlaskInjector
 from src.injectors.injector_modules import injector_modules
 from src.routes import register_blueprints
-from dotenv import load_dotenv
 
 
 
