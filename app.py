@@ -10,7 +10,6 @@ from src.injectors.injector_modules import injector_modules
 from src.routes import register_blueprints
 
 
-
 app = Flask(__name__)
 
 CORS(app)
@@ -31,8 +30,7 @@ FlaskInjector(app, modules=[lambda binder: injector_modules(binder, app)])
 if __name__ == '__main__':
     print('Starting application.')
     try:
-        app.run(host=app.config.get('HOST'))
+        app.run(host=app.config.get('HOST'), port=app.config.get('PORT'))    
     except Exception as e:
-        print(f'Application error: {e}')
         sys.exit(1)
     print('Closing application.')
