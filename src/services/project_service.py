@@ -20,7 +20,7 @@ class ProjectService:
         specifications = json_data['specifications'].lower()
 
         if Car.query.filter_by(vehicle_name=vehicle_name).first():
-            return jsonify({'error': 'Veículo já existe'}), 400
+            return jsonify({'error': 'vehicle already exists'}), 400
 
         create_register = self.repository.create_full_data(
             vehicle_name=vehicle_name,

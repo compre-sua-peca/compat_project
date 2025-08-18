@@ -6,34 +6,35 @@ from src.models.db_model import Car, Brand, CarModel
 class CompatRepository:
     
     def create_full_data(self, vehicle_name: str, brand_name: str, car_version: str, year: str, specifications: str):
-        brand = Brand.query.filter_by(name=brand_name).first()
+        brand = Brand.query.filter_by(brand_name=brand_name).first()
         if not brand:
-            new_brand = Brand(name=brand_name)
-            db.session.add(new_brand)
+            brand = Brand(brand_name=brand_name)
+            db.session.add(brand)
             db.session.flush()
         
         car = Car.query.filter_by(vehicle_name=vehicle_name).first()
         if not car:    
-            new_car = Car(
+            car = Car(
                 vehicle_name=vehicle_name,
-                id_brand=new_brand.id)
-            db.session.add(new_car)
+                id_brand=brand.id_brand)
+            db.session.add(car)
             db.session.flush()
         
         car_model = CarModel.query.filter_by(car_version=car_version).first()    
         if not car_model:
-            new_car_model = CarModel(
-                id_car=new_car.id,
+            car_model = CarModel(
+                id_car=car.id_car,
                 car_version=car_version,
                 year=year,
                 specifications=specifications)
-            db.session.add(new_car_model)
+            db.session.add(car_model)
+        
         try:
             db.session.commit()
             return jsonify({'success': "Data created successfully"}), 200
         except Exception as e:
             db.session.rollback()
-            raise (f"Error creating full data: {str(e)}")
+            return jsonify({'error': f"Error creating full data: {str(e)}"}), 500
         finally:
             db.session.close()
             
